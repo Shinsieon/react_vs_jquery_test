@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>jQuery 실시간 코인 시세</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+      table {
+        width: 500px;
+        border-collapse: collapse;
+      }
+      #tables {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 4px;
+        text-align: center;
+      }
+      tr.updated {
+        height: 30px;
+        max-height: 30px;
+        background-color: #e0f7fa;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>코인 실시간 시세 (jQuery)</h2>
+    <p>테이블 개수: <strong id="tableCount">40</strong></p>
+    <button id="start">시작</button>
+    <button id="stop">멈춤</button>
+    <div id="tables">
+      <!-- 동적으로 테이블이 생성됩니다 -->
+    </div>
+    <script>
+      const coins = [
+        "KRW-BTC",
+        "KRW-ETH",
+        "KRW-XRP",
+        "KRW-ADA",
+        "KRW-SOL",
+        "KRW-DOGE",
+        "KRW-TRX",
+        "KRW-ETC",
+        "KRW-BCH",
+        "KRW-ATOM",
+      ];
+
+      let socket = null;
+      const tableCount = 40; // 테이블 개수
+      $("#tableCount").text(tableCount);
+      function createTable(id) {
+        return `
+        <table id="${id}">
+          <thead>
+            <tr>
+              <th>코인</th>
+              <th>시간</th>
+              <th>현재가</th>
+              <th>변동률</th>
+              <th>거래량</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- 여기에 동적으로 종목 행 추가 -->
+          </tbody>
+        </table>
+      `;
+      }
+
+      function initTable(id) {
+        const $tbody = $(`#${id} tbody`);
+        $tbody.empty();
+        coins.forEach((code) => {
+          $tbody.append(`
+          <tr id="row-${code}">
+            <td>${code}</td>
+            <td class="time">-</td>
+            <td class="trade_price">-</td>
+            <td class="change_rate">-</td>
+            <td class="trade_volume">-</td>
+          </tr>
+        `);
+        });
+      }
+      // 테이블 초기화
+
+      // 시세 업데이트
+      function updateRow(tableId, data) {
+        const $table = $(`#${tableId}`);
+        const $row = $table.find(`#row-${data.code}`);
+        if ($row.length === 0) {
+          console.warn(`행이 존재하지 않습니다: ${data.code}`);
+          return;
+        }
+        $row.find(".time").text(data.trade_time);
+        $row.find(".trade_price").text(data.trade_price);
+        $row.find(".trade_volume").text(data.trade_volume);
+        $row.find(".change_rate").text(data.change_rate + "%");
+
+        // 시각적으로 업데이트된 행 표시
+      }
+
+      // WebSocket 연결
+      function startSocket() {
+        socket = new WebSocket("ws://localhost:4000");
+
+        socket.onopen = () => {
+          console.log("WebSocket 연결됨");
+        };
+
+        socket.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          for (let i = 0; i < tableCount; i++) {
+            const tableId = `priceTable${i + 1}`;
+            updateRow(tableId, data);
+          }
+          // 업데이트된 행에 클래스 추가
+        };
+
+        socket.onclose = () => {
+          console.log("WebSocket 연결 종료");
+        };
+      }
+
+      // 버튼 바인딩
+      $(document).ready(function () {
+        for (let i = 0; i < tableCount; i++) {
+          $("#tables").append(createTable(`priceTable${i + 1}`));
+          initTable(`priceTable${i + 1}`);
+        }
+
+        $("#start").click(() => {
+          if (!socket || socket.readyState !== 1) {
+            startSocket();
+          }
+        });
+
+        $("#stop").click(() => {
+          if (socket && socket.readyState === 1) {
+            socket.close();
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
